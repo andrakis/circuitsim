@@ -1,0 +1,96 @@
+<html>
+	<head>
+		<title>Electronics Simulatior</title>
+		<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.5.0/jquery.min.js"></script>
+		<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.9/jquery-ui.min.js"></script>
+		<style>
+			.panel { border: 1px solid; }
+			.panel.left { float: left; }
+			.panel.right { float: right; }
+			.panel.main { width: 70%; height: 400px; float: left; }
+			.clear { clear: both; }
+			.content { display: none; }
+			.visible { display: block; }
+		</style>
+		<script type="text/javascript" src="plugin.js"></script>
+		<script type="text/javascript">
+			function delayedBinding (callback) {
+				function binder () {
+					var self = this;
+					self.waiting = [];
+					self.handleFn = function() {
+						self.waiting.push(arguments);
+					};
+					self.handle = function() {
+						self.handleFn.apply(self, arguments);
+					};
+				}
+				var instance = new binder();
+				(function(i) {
+					$(function() {
+						i.waiting.forEach(function(item) {
+							callback.apply(callback, i.waiting.shift());
+						});
+						i.handleFn = callback;
+					});
+				})(instance);
+					
+				return instance.handle;
+			}
+
+			var $Debug = delayedBinding(function() {
+				for (var i = 0; i < arguments.length; i++) {
+					$("#log .content ul").prepend($("<li>").text(arguments[i].toString()));
+				}
+			});
+
+			$Debug("Starting...");
+
+			var $Sim = delayedBinding(function(callback) {
+				$Debug("A plugin is loading");
+				var plugin = new Plugin();
+				callback(plugin);
+			});
+
+			$(function() {
+				$(".panel h2").click(function() {
+					$(this).parent().find(".content").toggle();
+				});
+
+			});
+
+			(function() {
+				// Standard plugins
+				var _ = ["battery"];
+				for (var i = 0; i < _.length; i++) {
+					document.write("<scr" + "ipt type='text/javascript' src='plugin-" + _[i] + ".js'></scr" + "ipt>");
+				}
+			})();
+		</script>
+	</head>
+	<body>
+		<div id="toolbox" class="panel left">
+			<h2>Toolbox</h2>
+			<div class="content">
+				<ul></ul>
+			</div>
+		</div>
+		<div id="codebox" class="panel right">
+			<h2>Codebox</h2>
+			<div class="content">
+				<textarea id="code"></textarea>
+			</div>
+		</div>
+		<div id="view" class="main panel">
+			<div id="grid"></div>
+		</div>
+
+		<div class="clear">&nbsp;</div>
+
+		<div id="log" class="main panel">
+			<div class="content visible">
+				<ul></ul>
+			</div>
+		</div>
+	</body>
+</html>
