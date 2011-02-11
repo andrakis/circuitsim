@@ -8,9 +8,14 @@
 			.panel.left { float: left; }
 			.panel.right { float: right; }
 			.panel.main { width: 70%; height: 400px; float: left; }
+			.panel h2 { float: left; cursor: hand; }
+			.panel a.util { cursor: hand; text-decoration: underline; }
 			.clear { clear: both; }
-			.content { display: none; }
+			.content { display: none; clear: both; }
+			.panel.shown .content { display: block; }
 			.visible { display: block; }
+
+			#toolbox ul li { cursor: hand; text-decoration: underline; color: blue; }
 		</style>
 		<script type="text/javascript" src="plugin.js"></script>
 		<script type="text/javascript">
@@ -58,13 +63,38 @@
 				$Debug("A plugin is loading");
 				var plugin = new Plugin();
 				callback(plugin);
+
+				var li = $("<li></li>");
+				li.text(plugin.name());
+				li.click(function() {
+					var created = plugin.New();
+					$("#view #grid").append(created.$);
+				});
+
+				$("#toolbox .content ul").append(li);
 			});
 
 			$(function() {
+				// Clicking a panel heading will show / hide the panel contents
 				$(".panel h2").click(function() {
 					$(this).parent().find(".content").toggle();
 				});
+				
+				// Clicking an a.util in a panel will trigger the following callback to do something special
+				$(".panel a.util").click(function() {
+					id = $(this).attr('id');
 
+					switch(id) {
+						case "clear_log":
+							$("#log .content ul").html('');
+							break;
+
+						default:
+							// TODO: Plugins?
+							$Debug("Unhandled click event for util " + id);
+							break;
+					}
+				});
 			});
 
 			(function() {
@@ -77,7 +107,7 @@
 		</script>
 	</head>
 	<body>
-		<div id="toolbox" class="panel left">
+		<div id="toolbox" class="panel left shown">
 			<h2>Toolbox</h2>
 			<div class="content">
 				<ul></ul>
@@ -96,6 +126,8 @@
 		<div class="clear">&nbsp;</div>
 
 		<div id="log" class="main panel">
+			<h2>Log</h2>
+			<a class="util" id="clear_log">Clear Log</a>
 			<div class="content visible">
 				<ul></ul>
 			</div>
