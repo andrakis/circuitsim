@@ -23,7 +23,7 @@ Plugin.prototype.click = function(callback) {
 
 Plugin.prototype.New = function() {
 	var source = this;
-	return function (location) {
+	var constructor = function (location) {
 		var self = this;
 
 		self.type = source;
@@ -48,6 +48,12 @@ Plugin.prototype.New = function() {
 			self.getHtml = function() { 
 				return html;
 			};
+
+			return html;
 		};
 	};
+	source.New = function() {
+		return constructor;
+	};
+	return constructor;
 };
