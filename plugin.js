@@ -9,12 +9,16 @@ function Plugin () {
 	self._jquery_callbacks = {};
 }
 
-Plugin.prototype.name = function(name) {
-	this._name = name;
+Plugin.prototype.name = function() {
+	if (arguments.length)
+		this._name = arguments[0];
+	return this._name;
 };
 
-Plugin.prototype.html = function(html) {
-	this._html = html;
+Plugin.prototype.html = function() {
+	if (arguments.length)
+		this._html = arguments[0];
+	return this._html;
 };
 
 Plugin.prototype.click = function(callback) {
@@ -23,37 +27,40 @@ Plugin.prototype.click = function(callback) {
 
 Plugin.prototype.New = function() {
 	var source = this;
-	var constructor = function (location) {
+	var constructor = function () {
 		var self = this;
 
 		self.type = source;
 		self.id = source._name + ":" + __plugin_ids++;
-		self.location = location;
+		self.current = false;
+		self.$ = jQuery("<div></div>");
 
-		self.getHtml = function() {
+		for (var type in source._jquery_callbacks) {
+			(function(_type, _callback, _target) {
+				self.$.bind(_type, function() {
+					_callback(_target);
+				});
+			})(type, source._jquery_callbacks[type], self);
+		}
+
+		self.update = function() {
 			var html = source._html;
 			if (typeof html != "string") 
 				html = html(self);
-
-			html = jQuery(html);
-
-			for (var type in source._jquery_callbacks) {
-				(function(_type, _callback, _target) {
-					html.bind(_type, function() {
-						_callback(_target);
-					});
-				})(type, source._jquery_callbacks[type], self);
-			}
-
-			self.getHtml = function() { 
-				return html;
-			};
-
-			return html;
+			self.$.html(html);
 		};
+
+		self.getCurrent = function() { return self.current; };
+		self.setCurrent = function(value) { 
+			self.current = value;
+			self.update();
+			// TODO: Pass to connections
+		}
+
+		self.update();
 	};
 	source.New = function() {
-		return constructor;
+		return new constructor();
 	};
-	return constructor;
+	return new constructor();
 };
