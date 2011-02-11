@@ -1,0 +1,59 @@
+
+Diagram:Cell2
+               3:Test         4:Enable
+                   |              |
+                   |              +---.
+                   |              |   |
+                   |              \   |
+                   +------\        >--#--@5:True
+                   |       >------/   |
+                ---#------/           |                    
+                |  |                  \
+                |  -------\            >--@6:False
+                |          >----------/
+                +-----!---/      
+                |               /-------------------------------------------
+                |              /        --.                                |  The loop there is to synchronise
+             V  |             /         | |                        -----\  |  the pulse with the OR gate over here.
+                |-------------          | ------------------------/      )-'  Using a direct line causes the OR to
+                                        |                               /     output the incorrect value for 4 pulses.
+         --!----------------------------#---+------------------------.  |
+         |                              |   |                        |  |
+0:Select-+--------------------------\   |   |                        |  |
+         |                           >--|   |                        \  |
+         |                          /       |                         >-'
+         \                          |       \                        /   
+          >-*---\        *:SetT1-\  |        >---+-\      *:SetT0-\  |
+1:Set--*-/  |    >------/         )-*-.     /    |  >----/         )-*-.
+       |    |   /                /    |     |  --#-/              /    |
+2:SetV-#-*--#--/         Cell 1  |    \     |  | |        Cell 0  |    \
+       | |  |                    |     >-.  |  | ------\          |     >-.
+       | |  -----\       *:SetF1-#--!-/  |  |  |        >-*:SetF0-#--!-/  |
+       | |        >-----/        |       |  |  +----!--/          |       |
+       | *----!--/               |--------  |  |                  |--------
+       | |                                  |  |                             
+       --#----------------------------------'  |
+         --------------------------------------'
+End
+
+Code:Cell2
+In:[0:Select,Set,SetV,Test,Enable]
+Out:[5:True,6:False]
+My SetT1,SetF1,SetT0,SetF0
+My Cell1,Cell0
+My V
+
+SetT1 = Select && (Set && SetV)
+SetF1 = Select && (Set && !SetV)
+SetT0 = !Select && (Set && SetV)
+SetF0 = !Select && (Set && !SetV)
+
+Cell1 = (Cell1 || SetT1) && !SetF1
+Cell0 = (Cell0 || SetT0) && !SetF0
+
+V = (Cell1 || Cell0)
+
+True = Test && V && Enable
+False = Test && !V && Enable
+
+End

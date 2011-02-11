@@ -1,0 +1,810 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+ <head>
+  <title> new document </title>
+  <meta name="generator" content="editplus" />
+  <meta name="author" content="" />
+  <meta name="keywords" content="" />
+  <meta name="description" content="" />
+  <script type="text/javascript" src="jquery-1.3.2.js"></script>
+  <style>
+	#display, #src {
+		font-family: Fixed, monospace;
+	}
+	#display {
+		border: 1px solid;
+		font-weight: bold;
+	}
+	#log {
+		height: 200px;
+		overflow: auto;
+	}
+  </style>
+  <script>
+	// Class matrix (used to get references to neighbouring classes)
+	var clsMatrix = [];
+
+	/** Convert textarea 'src' into a matrix that we can step through **/
+	function mkMatrix() {
+		var src = $("textarea#src").val();
+		var lines = [];
+		var current = [];
+
+		src = src.split('');
+		for (var i = 0; i < src.length; i++) {
+			switch(src[i]) {
+				case '\n':
+					lines.push(current);
+					current = [];
+					continue;
+
+				default:
+					current.push(src[i]);
+					break;
+			}
+		}
+
+		lines.push(current);
+		return lines;
+	}
+
+	function Dbg(x) {
+		$("div#log").prepend($("<div></div>").append(x));
+	}
+
+	/**
+	 * Applies inheritance to a class (first argument) from classes (second, third, and
+	 * so on, arguments).
+	 *
+	 * Notes:
+	 *  - This WILL BREAK the instanceof operator! Use the isInstanceOf() function instead.
+	 *  - Parent classes must be fully declared before calling this function.
+	 *  - Multiple classes will be copied in sequence.
+	 *  - Properties that already exists in class will not be copied.
+	 */
+	function applyInheritance() {
+	  // Validate arguments
+	  if (arguments.length < 2) {
+		throw new Error("No inheritance classes given");
+	  }
+	 
+	  var toClass = arguments[0];
+	  var fromClasses = Array.prototype.slice.call(arguments, 1, arguments.length);
+	 
+	  // Check if class referencer has been created
+	  if (applyInheritance.allClasses === undefined) {
+		applyInheritance.allClasses = [];
+	  }
+	 
+	  // Check for inheritance metadata in toClass
+	  if (toClass.meta === undefined) {
+		toClass.meta = {
+		  index: applyInheritance.allClasses.length,
+		  fromClasses : [],
+		  toClasses: []
+		};
+		toClass.meta.fromClasses[toClass.meta.index] = true; // class links to itself
+		applyInheritance.allClasses.push(toClass);
+	  }
+	 
+	  // Apply inheritance fromClasses
+	  var fromClass = null;
+	  for (var i = 0; i < fromClasses.length; i++) {
+		fromClass = fromClasses[i];
+	 
+		// Check for inheritance metadata in fromClass
+		if (fromClass.meta === undefined) {
+		  fromClass.meta = {
+			index: applyInheritance.allClasses.length,
+			fromClasses: [],
+			toClasses: []
+		  };
+		  fromClasses[i].meta.fromClasses[fromClass.meta.index] = true; // class links to itself
+		  applyInheritance.allClasses.push(fromClass);
+		}
+	 
+		// Link toClass and fromClass
+		toClass.meta.fromClasses[fromClass.meta.index] = true;
+		fromClass.meta.toClasses[toClass.meta.index] = true;
+	 
+		// Copy prototype fromClass toClass
+		for (var property in fromClass.prototype) {
+		  if (toClass.prototype.hasOwnProperty(property) === false) {
+			// Copy missing property from the parent class to the inheritance class
+			toClass.prototype[property] = fromClass.prototype[property];
+		  }
+		}
+	  }
+	}
+
+	var currentSpeed = 0;
+	var currentRunInstance = 0;
+	var rate = 0;		// Rate per second
+
+	setInterval(function() {
+		$("#rateCounter").text(rate.toString());
+		//rate = 0;
+	}, 250);
+
+	// Neighbours
+	var N_NW = 0, N_N = 1, N_NW = 2,
+		N_W  = 3,/*This,*/ N_E = 4,
+		N_SW = 5, N_S = 6, N_SE = 7;
+
+	// Generic wire
+	function Wire () {
+		this.pos_y = 0;
+		this.pos_x = 0;
+		this.element = null;
+		this.current = -1;	// Not set
+		this.direction = '*';
+		this.drawNow = 0;
+		return this;
+	}
+
+	Wire.prototype.setHtmlElement = function(ele, symbol) {
+		// Child classes should do something with ele
+		$(ele).text(symbol || '.');
+		this.element = ele;
+		switch(symbol) {
+			case '-':
+			case '|':
+			case '\\':
+			case '/':
+				this.direction = symbol;
+				break;
+		}
+	};
+
+	Wire.prototype.setPosition = function(y, x) {
+		this.pos_y = y;
+		this.pos_x = x;
+	};
+
+	// Get neighbouring classes
+	Wire.prototype.getNeighbours = function(callee) {
+		// Protection against endless runs
+		if (this.instanceId != currentRunInstance) return [];
+
+		var self = this;
+
+		// Helper function that gets the neighbour at the specified offset (-1, 0, or +1 in X or Y)
+		var _ = function(offy, offx) {
+			var ay = self.pos_y + offy;
+			var ax = self.pos_x + offx;
+			if (ay < 0 || ay > clsMatrix.length - 1)
+				return null;
+			if (ax < 0 || ax > clsMatrix[ay].length - 1)
+				return null;
+			if (clsMatrix[ay][ax] == callee) return null;
+			return clsMatrix[ay][ax];
+		};
+
+		switch(self.direction) {
+			case '|':
+				return [
+					_(-1, 0),
+					_( 1, 0),
+				];
+
+			case '-':
+				return [
+					_(0, -1), _(0, 1),
+				];
+
+			case '\\':
+				return [
+					_(-1, -1),
+							  /* Middle */
+										  _( 1, 1),
+				];
+
+			case '/':
+				return [
+										  _(-1, 1),
+							  /* Middle */
+					_( 1, -1),
+				];
+
+			case '+':
+				return [
+							   _(-1, 0),
+					_(0, -1),			 _(0, 1),
+							   _( 1, 0),
+				];
+
+			case 'x':
+			case 'X':
+				return [
+					_(-1, -1),			 _(-1, 1),
+							/* Middle */
+					_( 1, -1),			 _( 1, 1),
+				];
+
+			case 'V':
+			case 'v':
+				return [
+					_(-1, -1),			 _(-1, 1),
+							/* Middle */
+							  _( 1, 0)
+				];
+
+			case 'A':	// Inverse to V, but also does across (it has a line through it!)
+				return [
+							  _(-1, 0),
+					_( 0, -1),			 _( 0, 1),
+					_( 1, -1),			 _( 1, 1),
+				];
+
+			case '>':
+				return [
+					_(-1, -1),
+										_( 0, 1),
+					_( 1, -1),
+				];
+
+			case '-':	// Single direction
+			case ']':	// Read only mid left and mid right
+				return [
+					_( 0, -1),			_( 0, 1),
+				];
+
+			case '<':
+				return [
+										_(-1, 1),
+					_( 0, -1),
+										_( 1, 1),
+				];
+
+			case '*':
+			default:
+				return [
+					_(-1, -1), _(-1, 0), _(-1, 1),
+					_( 0, -1),           _( 0, 1),
+					_( 1, -1), _( 1, 0), _( 1, 1)
+				];
+		}
+	};
+
+	Wire.prototype.setCurrent = function(current, callee) {
+		var self = this;
+
+		rate++;
+
+		if (current == undefined) {
+			Dbg("UNDEFINED CURRENT??");
+			return;
+		}
+
+		//this.drawNow = !this.drawNow;
+		//Dbg(this.drawNow);
+
+		if (self.current == current)
+			return;
+
+		self.current = current;
+
+		$(self.element).css('color', (current > 0 ? 'green' : 'red'));
+		var neighbours = self.getNeighbours();
+		$.each(neighbours, function(i, neighbour) {
+			if (neighbour && neighbour != callee) {
+				var fn = function() {
+					neighbour.setCurrent(current, self);
+				};
+				if (currentSpeed > 0) {
+					setTimeout(fn, currentSpeed);
+				} else {
+					fn();
+				}
+			}
+		});
+	};
+
+	function CornerWire () {
+		this.direction = '*';
+		this.input = 0;
+		this.output = 0;
+	}
+	applyInheritance(CornerWire, Wire);
+
+	CornerWire.prototype.setHtmlElement = function(ele, symbol) {
+		this.element = ele;
+		$(ele).html($('<span></span>').text(symbol));
+		switch(symbol) {
+			case '.':	// west to south
+				this.input = N_W;
+				this.output = N_S;
+				break;
+
+			case '`':	// north to east
+				this.input = N_N;
+				this.output = N_E;
+				break;
+
+			case ',':	// south to east
+				this.input = N_S;
+				this.output = N_E;
+				break;
+
+			case "'":	// west to north
+				this.input = N_W;
+				this.output = N_N;
+				break;
+
+			case "f":	// east to south
+				this.input = N_E;
+				this.output = N_S;
+				break;
+
+			default:
+				Dbg('CornerWire doesnt know type ' + symbol);
+				break;
+		}
+	};
+
+	CornerWire.prototype.setCurrent = function(current, callee) {
+		var neighbours = this.getNeighbours();
+
+		rate++;
+
+		if (neighbours[this.output]) {
+			neighbours[this.output].setCurrent((neighbours[this.input] || {current:0}).current, this);
+		} else {
+			Dbg('Dont have output wire');
+		}
+	};
+
+	function OneWayWire () {
+		this.direction = '*';
+		this.input = 0;
+		this.output = 0;
+	}
+	applyInheritance(OneWayWire, Wire);
+
+	OneWayWire.prototype.setHtmlElement = function(ele, symbol) {
+		this.element = ele;
+		$(ele).html($('<span></span>').text(symbol));
+		switch(symbol) {
+			case "{":	// only allow from east to west
+				this.input = N_E;
+				this.output = N_W;
+				break;
+
+			case "}":	// only allow from west to east
+				this.input = N_W;
+				this.output = N_E;
+				break;
+
+			case '^':	// only allow from south to north
+				this.input = N_S;
+				this.output = N_N;
+				break;
+
+			case '?':	// only allow from north to south
+				this.input = N_N;
+				this.output = N_S;
+				break;
+
+			default:
+				Dbg('OneWayWire doesnt know type ' + symbol);
+				break;
+		}
+	};
+
+	OneWayWire.prototype.setCurrent = function(current, callee) {
+		var neighbours = this.getNeighbours();
+
+		rate++;
+
+		if (callee == neighbours[this.input] && neighbours[this.output]) {
+			neighbours[this.output].setCurrent(callee.current, this);
+		} // Don't do anything if callee is not input
+	};
+
+	function Battery () {
+		this.powered = false;
+	}
+	applyInheritance(Battery, Wire);
+	Battery.prototype.setHtmlElement = function(ele, symbol) {
+		var self = this;
+		self.element = ele;
+		$(ele).html($('<a></a>').text(symbol || '*').attr('title', 'Battery'));
+		$(ele).click(function() {
+			self.powered = !self.powered;
+			Dbg('Battery is now ' + (self.powered ? 'on' : 'off'));
+			self.element.css('color', (self.powered ? 'orange' : 'black'));
+			self.setCurrent(self.powered ? 1 : 0, self);
+		});
+	}
+	Battery.prototype.superSetCurrent = Battery.prototype.setCurrent;
+	Battery.prototype.setCurrent = function(current, callee) {
+		this.powered = (current > 0);
+		Wire.prototype.setCurrent.call(this, current, callee);
+	};
+
+	function Light () {
+	}
+	applyInheritance(Light, Wire);
+	Light.prototype.setCurrent = function(current) {
+		var self = this;
+
+		rate++;
+
+		if (self.current == current)
+			return;
+
+		self.current = current;
+		$(self.element).css('color', (current > 0 ? 'orange' : 'black'));
+		// Don't pass current to neighbours
+	}
+	Light.prototype.setHtmlElement = function(ele, symbol) {
+		var self = this;
+		self.element = ele;
+		$(ele).text(symbol || '@');
+	};
+
+	function Gate () {
+		this.current = 0;
+		this.direction = '-';
+		this.inputs = [];	// 0 = a, 1 = b, ...
+		this.output = null;	// The index of the output neighbour
+		// Define only the it
+		this.truthTable = [];
+		this.title = 'Gate';
+		this.customCurrent = false;
+		this.customCurrentValue = 0;
+	}
+	applyInheritance(Gate, Wire);
+	Gate.prototype.setHtmlElement = function(ele, symbol) {
+		this.element = ele;
+		$(ele).html($('<a></a>').text(symbol || '>').attr('title', this.title));
+	};
+	Gate.prototype.setCurrent = function(current) {
+		var neighbours = this.getNeighbours();
+
+		rate++;
+
+		var truth = this.truthSatisfied(neighbours);
+		$(this.element).css('color', current ? (truth ? 'lime' : 'red') : 'red');
+
+		if (this.output != null && neighbours[this.output]) {
+			//Dbg("Send output " + current);
+			neighbours[this.output].setCurrent(truth, this);
+		} else {
+			Dbg("Output neighbour not found");
+		}
+	};
+	Gate.prototype.truthSatisfied = function(neighbours) {
+		var inputTable = {};
+
+		for (var i = 0; i < this.inputs.length; i++) {
+			inputTable[i] = (neighbours[this.inputs[i]] || {current: -1}).current;
+			//Dbg("input " + i + " = " + inputTable[i]);
+		}
+
+		// Look for matching entry in truth table
+		for (var i = 0; i < this.truthTable.length; i++) {
+			var match = true;
+			for (var key in this.truthTable[i]) {
+				if (key != 'o' && inputTable[key] != this.truthTable[i][key]) {
+					match = false;
+					break;
+				}
+			}
+			if (match) {
+				return this.truthTable[i]['o'];	// Output
+			}
+		}
+
+		Dbg("Truth entry not found");
+		return 0;
+	};
+
+	// Symbol: ]
+	// Only allows current to pass left to right
+	function GuardGateRight () {
+		this.direction = '-';
+		this.inputs = [0];
+		this.output = 1;
+		this.current = 0;
+		this.truthTable = [
+			{ 0: 0, o: 0 },
+			{ 0: 1, o: 1 },
+		];
+	}
+	applyInheritance(GuardGateRight, Gate);
+
+	// Symbol: !
+	// Negate
+	function NotGate () {
+		this.direction = '-';
+		this.inputs = [0];
+		this.output = 1;
+		this.current = 0;
+		this.truthTable = [
+			{ 0: 0, o: 1 },
+			{ 0: 1, o: 0 },
+		];
+		this.title = 'Not Gate';
+	}
+	applyInheritance(NotGate, Gate);
+
+	// Symbol: &
+	function NAndGate () {
+		this.direction = '>';
+		this.inputs = [0, 2];	// top, bottom of >
+		this.output = 1;
+		this.current = 0;
+		this.truthTable = [
+			{ 0: 0, 1: 0, o: 1 },
+			{ 0: 0, 1: 1, o: 1 },
+			{ 0: 1, 1: 0, o: 1 },
+			{ 0: 1, 1: 1, o: 0 },
+		];
+		this.title = 'NAND Gate';
+	}
+	applyInheritance(NAndGate, Gate);
+
+	// Symbol: >
+	function AndGate () {
+		this.direction = '>';
+		this.inputs = [0, 2];
+		this.output = 1;
+		this.current = 0;
+		this.truthTable = [
+			{ 0: 0, 1: 0, o: 0 },
+			{ 0: 1, 1: 0, o: 0 },
+			{ 0: 0, 1: 1, o: 0 },
+			{ 0: 1, 1: 1, o: 1 },
+		];
+		this.title = 'AND Gate';
+	};
+	applyInheritance(AndGate, Gate);
+
+	// Symbol: )
+	function OrGate () {
+		this.direction = '>';
+		this.inputs = [0, 2];
+		this.output = 1;
+		this.current = 0;
+		this.truthTable = [
+			{ 0: 0, 1: 0, o: 0 },
+			{ 0: 1, 1: 0, o: 1 },
+			{ 0: 0, 1: 1, o: 1 },
+			{ 0: 1, 1: 1, o: 1 },
+		];
+		this.title = 'OR Gate';
+	}
+	applyInheritance(OrGate, Gate);
+
+	// Symbol: $
+	function XorGate () {
+		this.direction = '>';
+		this.inputs = [0, 2];
+		this.output = 1;
+		this.current = 0;
+		this.truthTable = [
+			{ 0: 0, 1: 0, o: 0 },
+			{ 0: 1, 1: 0, o: 1 },
+			{ 0: 0, 1: 1, o: 1 },
+			{ 0: 1, 1: 1, o: 0 },
+		];
+		this.title = 'XOR Gate';
+	}
+	applyInheritance(XorGate, Gate);
+
+	// Symbol: #
+	// Jump wire. Anything passing left goes to right
+	//            Anything passing top goes to bottom
+	function JumpGate () {
+		this.direction = '+';
+		this.title = 'Jump Gate';
+	}
+	applyInheritance(JumpGate, Wire);
+
+	JumpGate.prototype.setCurrent = function(current, callee) {
+		var neighbours = this.getNeighbours();	// Ignore callee
+
+		rate++;
+
+		// Find direction
+		if (callee == neighbours[0]) {
+			// Top
+			neighbours[3].setCurrent(neighbours[0].current);
+		} else if (callee == neighbours[3]) {
+			// Bottom
+			neighbours[0].setCurrent(neighbours[3].current);
+		} else if (callee == neighbours[1]) {
+			// Left
+			neighbours[2].setCurrent(neighbours[1].current);
+		} else if (callee == neighbours[2]) {
+			// Right
+			neighbours[1].setCurrent(neighbours[2].current);
+		} else {
+			Dbg("Unknown direction");
+		}
+	};
+
+    $(function() {
+		$("button#update").click(function() {
+			currentRunInstance++;
+			$("div#log").text('');
+			var matrix = mkMatrix();
+			var batteries = [];
+			clsMatrix = [];
+			clsMatrix.length = matrix.length;
+			
+			var canvas = $('<span class="output"></span>');
+
+			var ele, wire;
+			for (var y = 0; y < matrix.length; y++) {
+				clsMatrix[y] = [];
+				clsMatrix[y].length = matrix[y].length;
+				for (var x = 0; x < matrix[y].length; x++) {
+					wire = null;
+					ele = $('<span></span>');
+					switch(matrix[y][x]) {
+						// Switches are for now considered batteries
+						case '0':
+						case '1':
+						case '2':
+						case '3':
+						case '4':
+						case '5':
+						case '6':
+						case '7':
+						case '8':
+						case '9':
+						case '*':
+							wire = new Battery();
+							batteries.push(wire);
+							break;
+
+						case ',':
+						case '.':
+						case '`':
+						case "'":
+						case 'f':
+							wire = new CornerWire();
+							break;
+
+						case '}':
+						case '{':
+						case '^':
+						case '?':
+							wire = new OneWayWire();
+							break;
+
+						case ' ':
+							// Empty
+							ele.html('&nbsp;');
+							break;
+
+						case '@':
+							// Light
+							wire = new Light();
+							break;
+
+						case '>':
+							// AndGate
+							wire = new AndGate();
+							break;
+
+						case ')':
+							wire = new OrGate();
+							break;
+
+						case '$':
+							wire = new XorGate();
+							break;
+
+						case ']':
+							// GuardGateRight
+							wire = new GuardGateRight();
+							break;
+
+						case '!':
+							// NotGate
+							wire = new NotGate();
+							break;
+
+						case '#':
+							// JumpGate (vertical, horizontal)
+							wire = new JumpGate();
+							break;
+
+						case '&':
+							// NAndGate
+							wire = new NAndGate();
+							break;
+
+						default:	// Assume wire
+							wire = new Wire();
+							break;
+					}
+					clsMatrix[y][x] = wire;
+					if (wire) { 
+						wire.instanceId = currentRunInstance;
+						wire.setHtmlElement(ele, matrix[y][x]);
+						wire.setPosition(y, x);
+					}
+					canvas.append(ele);
+				}
+				// New line
+				canvas.append($('<br/>'));
+			}
+
+			$("div#display").html(canvas);
+
+			rate = 0;
+
+			for (var i = 0; i < batteries.length; i++)
+				batteries[i].setCurrent(0);
+
+		}).click();
+
+		$("input#speed").change(function() {
+			currentSpeed = parseInt($(this).val());
+		});
+
+		try {
+			currentSpeed = parseInt($("input#speed").val());
+		} catch (e) {
+			currentSpeed = 0;
+		}
+	});
+  </script>
+ </head>
+
+ <body>
+ <!--
+           @
+        @ | @
+        +/  /
+         \  |
+*---.--\  \  \
+   / \  X A   \
+   |  |  V \  |
+   |  @  |  \  \
+   \     @   @ |
+    \     -----/
+     ----/
+	 -->
+  <textarea id="src" rows=10 cols=80>
+Row 1: *-----------------------.  /--------------
+                               | |               \
+Row 2: 1 2---------------------#-#-.             |
+       `----------------#---.  | | |             |
+Row 3: 1 2---------------\  | -#-#-#-.           |
+       |                  --#/ | | | |           |
+       `-------------------.|  + | | |           |
+                           || @@@| / |           |                    
+                           \@    /@  /           |                      
+Middle: *                   @  +- @--            |                    
+ /-------                   @ @@@ @              |                    
+|                           @     @              |                    
+|                           @     @              |                    
+|                           | @@@ |              |                    
+|                           |  +  |              |                              
+|                           |  |  |              |                              
+|                           |  |  |              |                              
+\                           |  |  |              |                              
+ ---------------------------#--#--#-------------/  
+                            |  |  |                             
+       ---------------------'  |  |        
+Row x: 1 2---------------------#--'                                             
+                               |                  
+Row x: *----------------------/                                                 
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+  </textarea>
+  <span>Instructions run: <span id="rateCounter">0</span></span>
+  <button id="update">Update</button>
+  Current Speed: <input type="text" id="speed" value="0"/>
+  <div id="display"></div>
+  <div id="log"></div>
+ </body>
+</html>
