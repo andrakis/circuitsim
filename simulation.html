@@ -42,7 +42,7 @@
 				(function(i) {
 					$(function() {
 						i.waiting.forEach(function(item) {
-							callback.apply(callback, i.waiting.shift());
+							callback.apply(callback, item);
 						});
 						i.handleFn = callback;
 					});
