@@ -7,6 +7,10 @@ function Plugin () {
 	self._name = "(Untitled plugin " + self.id + ")";
 	self._html = "<span>?</span>";
 	self._jquery_callbacks = {};
+	// Default implementation - simply set outputs and inputs, 1 to 1 relationship
+	self._attachOutputToHandler = function(from, to) {
+	};
+	self._inputs = [];	// Default
 }
 
 Plugin.prototype.name = function() {
@@ -22,7 +26,15 @@ Plugin.prototype.html = function() {
 };
 
 Plugin.prototype.click = function(callback) {
+	assert(callback, "Callback required!");
 	this._jquery_callbacks["click"] = callback;
+};
+
+Plugin.prototype.input = function(names, callback) {
+	assert(callback, "Callback required!");
+	if (typeof names == "string") names = [names];
+
+	
 };
 
 Plugin.prototype.New = function() {
@@ -31,14 +43,28 @@ Plugin.prototype.New = function() {
 		var self = this;
 
 		self.type = source;
-		self.id = source._name + ":" + __plugin_ids++;
+		self.id = source._name + __plugin_ids++;
 		self.current = false;
-		self.$ = jQuery("<div></div>");
+		self._inputs = {};
+		self._outputs = [];
+
+		self.$ = jQuery("<div class='plugin'></div>");
+		self.$.attr('plugin_id', self.id);
+
+		var special = jQuery("<div class='special'></div>");
+		var visual  = jQuery("<div class='visual'></div>");
+		self.$.append(special).append(visual);
+
+		self.$.click(function() {
+			$(this).toggleClass("selected");
+		});
 
 		for (var type in source._jquery_callbacks) {
 			(function(_type, _callback, _target) {
 				self.$.bind(_type, function() {
-					_callback(_target);
+					if (!$Ignore(_type)) {
+						_callback(_target);
+					}
 				});
 			})(type, source._jquery_callbacks[type], self);
 		}
@@ -47,15 +73,26 @@ Plugin.prototype.New = function() {
 			var html = source._html;
 			if (typeof html != "string") 
 				html = html(self);
-			self.$.html(html);
+			visual.html(html);
+		};
+
+		self.updateLogic = function() {
+			
 		};
 
 		self.getCurrent = function() { return self.current; };
-		self.setCurrent = function(value) { 
-			self.current = value;
-			self.update();
-			// TODO: Pass to connections
+		self.setCurrent = function(value) {
+			if (self.current != value) {
+				self.current = value;
+				self.update();
+				// TODO: Pass to connections
+			}
 		}
+
+		self.attachOutputTo = function(to) {
+			source._attachOutputToHandler(self, to);
+			self.update();
+		};
 
 		self.update();
 	};

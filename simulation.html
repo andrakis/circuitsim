@@ -10,12 +10,27 @@
 			.panel.main { width: 70%; height: 400px; float: left; }
 			.panel h2 { float: left; cursor: hand; }
 			.panel a.util { cursor: hand; text-decoration: underline; }
+			.panel .util.active { background-color: yellow; }
+			
 			.clear { clear: both; }
 			.content { display: none; clear: both; }
 			.panel.shown .content { display: block; }
 			.visible { display: block; }
+			.hidden  { display: none; }
+
+			div.plugin { float: left; margin: 1em; }
+			div.plugin:hover { border: 1px solid; }
+			div.plugin.selected { background-color: yellow; }
+			div.plugin.candidate { background-color: lightGreen; }
+			div.plugin.noncandidate { background-color: red; }
+			div.plugin.candidate:hover { background-color: cyan; }
+			div.plugin.link { background-color: yellow; }
+			div.plugin.input { /* Todo: Image */ }
+			div.plugin.output { /* Todo: Image */ }
 
 			#toolbox ul li { cursor: hand; text-decoration: underline; color: blue; }
+
+			#toolbar ul li { list-style: none; border: 1px solid; text-decoration: underline; float: left; cursor: hand; margin-left: 1.5em; }
 		</style>
 		<script type="text/javascript" src="plugin.js"></script>
 		<script type="text/javascript">
@@ -57,36 +72,131 @@
 				}
 			});
 
+			var assert = function(value, message) {
+				if (!value) throw new Error(message);
+			};
+
+			var _IgnoreStates = {all: false};
+			var $Ignore = function(what, value) {
+				if (arguments.length == 2) {
+					_IgnoreStates[what] = value;
+				}
+				return _IgnoreStates['all'] || _IgnoreStates[what] || false;
+			};
+
 			$Debug("Starting...");
 
+			var instantiatedObjects = {};
+
 			var $Sim = delayedBinding(function(callback) {
-				$Debug("A plugin is loading");
 				var plugin = new Plugin();
-				callback(plugin);
+
+				try {
+					callback(plugin);
+				} catch (e) {
+					var stack = (e.stack || "Unknown, upgrade your browser").replace(/\n/g, ' ').replace(/\(\(function.*$/, '');
+					$Debug("Plugin exception: " + stack);
+					return;
+				}
 
 				var li = $("<li></li>");
 				li.text(plugin.name());
 				li.click(function() {
 					var created = plugin.New();
+					instantiatedObjects[created.id] = created;
 					$("#view #grid").append(created.$);
 				});
 
 				$("#toolbox .content ul").append(li);
+				$Debug("Plugin loaded: " + plugin.name());
 			});
 
 			$(function() {
 				// Clicking a panel heading will show / hide the panel contents
 				$(".panel h2").click(function() {
-					$(this).parent().find(".content").toggle();
+					$(this).parent().find(".content").slideToggle();
 				});
+
+				// Allows you to link one item to another
+				function attachLinkHandler () {
+					$Ignore('click', true);
+
+					$("#link").addClass("active");
+					$(".plugin").addClass("candidate");
+					$(".plugin.candidate").click(function(e) {
+						var first = ($(".link.from").length == 0);
+						if ($(this).is('.candidate')) {
+							if (first) {
+								first = false;
+								// De-activate candidate on this item
+								$(this).removeClass("candidate");
+								$(this).addClass("link").addClass("from");
+							} else {
+								$(this).addClass("link").addClass("to");
+								link_objects();
+								detachLinkHandler();
+							}
+						}
+						return false;
+					});
+				}
+
+				function link_objects () {
+					var from = $(".link.from").attr('plugin_id');
+					var to   = $(".link.to").attr('plugin_id');
+					if (!from || !to) {
+						alert("Error getting targets");
+						return;
+					}
+
+					from = instantiatedObjects[from];
+					to   = instantiatedObjects[to  ];
+
+					from.attachOutputTo(to);
+				}
+				function detachLinkHandler () {
+					$Ignore('click', false);
+					$("#link").removeClass("active").text('Link');
+					$(".plugin").removeClass("candidate").removeClass("link").removeClass("from").removeClass("to");
+				};
+
+				function simulate (enable) {
+					$Ignore("all", !enable);
+					if (enable) {
+						$("#toolbar ul.design").addClass('hidden');
+						$("#toolbar ul.runtime").removeClass('hidden');
+					} else {
+						$("#toolbar ul.design").removeClass('hidden');
+						$("#toolbar ul.runtime").addClass('hidden');
+					}
+				}
+				simulate(false);
 				
-				// Clicking an a.util in a panel will trigger the following callback to do something special
-				$(".panel a.util").click(function() {
+				// Clicking a .util in a panel will trigger the following callback to do something special
+				$(".panel a.util, .panel ul.util li").click(function() {
 					id = $(this).attr('id');
 
 					switch(id) {
 						case "clear_log":
 							$("#log .content ul").html('');
+							break;
+
+						case "link":
+							if ($(this).is('.active')) {
+								$(this).text('Link');
+								detachLinkHandler();
+							} else {
+								$(this).text('Cancel Link');
+								attachLinkHandler();
+							}
+							break;
+
+						case "mode_run":
+							simulate(true);
+							break;
+
+						case "mode_design":
+							simulate(false);
 							break;
 
 						default:
@@ -99,7 +209,7 @@
 
 			(function() {
 				// Standard plugins
-				var _ = ["battery"];
+				var _ = ["battery", "gates"];
 				for (var i = 0; i < _.length; i++) {
 					document.write("<scr" + "ipt type='text/javascript' src='plugin-" + _[i] + ".js'></scr" + "ipt>");
 				}
@@ -120,6 +230,15 @@
 			</div>
 		</div>
 		<div id="view" class="main panel">
+			<div id="toolbar">
+				<ul class="design util">
+					<li id="link">Link</li>
+					<li id="mode_run">Exit Design Mode</li>
+				</ul>
+				<ul class="runtime util hidden">
+					<li id="mode_design">Enter Design Mode</li>
+				</ul>
+			</div>
 			<div id="grid"></div>
 		</div>
 

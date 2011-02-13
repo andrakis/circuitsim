@@ -11,4 +11,7 @@ $Sim(function($) {
 		self.setCurrent(!self.getCurrent());
 	});
 
+	$.input("input", function(self, current) {
+		self.setCurrent(current);
+	});
 });
