@@ -48,16 +48,12 @@ Plugin.prototype.New = function() {
 		self._inputs = {};
 		self._outputs = [];
 
-		self.$ = jQuery("<div class='plugin'></div>");
+		self.$ = jQuery("<div class='plugin ui-widget-content'></div>");
 		self.$.attr('plugin_id', self.id);
 
 		var special = jQuery("<div class='special'></div>");
 		var visual  = jQuery("<div class='visual'></div>");
 		self.$.append(special).append(visual);
-
-		self.$.click(function() {
-			$(this).toggleClass("selected");
-		});
 
 		for (var type in source._jquery_callbacks) {
 			(function(_type, _callback, _target) {
