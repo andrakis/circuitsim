@@ -103,6 +103,19 @@
 				li.text(plugin.name());
 				li.click(function() {
 					var created = plugin.New();
+							
+					(function(p) {
+						$(p).draggable({
+							containment: '#view',
+//							delay: 400,
+							distance: 30,
+							grid: [5, 5],
+							scroll: true,
+							snap: true,
+							snapMode: 'outer',
+						}).addClass('selectable');
+					})(created.$);					
+
 					instantiatedObjects[created.id] = created;
 					$("#view #grid").append(created.$);
 				});
@@ -165,12 +178,20 @@
 					if (enable) {
 						$("#toolbar ul.design").addClass('hidden');
 						$("#toolbar ul.runtime").removeClass('hidden');
+						$("div.plugin").removeClass('selectable');
 					} else {
 						$("#toolbar ul.design").removeClass('hidden');
 						$("#toolbar ul.runtime").addClass('hidden');
+						$("div.plugin").addClass('selectable');
 					}
 				}
 				simulate(false);
+
+				$("div.plugin.selectable").live('click', function() {
+					if (!$(this).hasClass('ui-draggable-dragging')) {
+						$(this).toggleClass('selected');
+					}
+				});
 				
 				// Clicking a .util in a panel will trigger the following callback to do something special
 				$(".panel a.util, .panel ul.util li").click(function() {
@@ -239,6 +260,7 @@
 					<li id="mode_design">Enter Design Mode</li>
 				</ul>
 			</div>
+			<div class="clear">&nbsp;</div>
 			<div id="grid"></div>
 		</div>
 
