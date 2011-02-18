@@ -75,7 +75,8 @@ Plugin.prototype.New = function() {
 		}
 
 		self.setOutput = function(out) {
-			if (!self._outputs.indexOf(out)) self._outputs.push(out);
+			if (self._outputs.indexOf(out) == -1) 
+				self._outputs.push(out);
 		};
 
 		self.$.mouseenter(function() {
