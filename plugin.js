@@ -66,6 +66,7 @@ Plugin.prototype.New = function() {
 					helper.addClass('chosen');
 				});
 				helper.bind('fire', function(e, from) {
+					helper.removeClass('chosen');
 					$Debug('Linked to input ' + name);
 					self._inputs[name] = from;
 					from.setOutput(self);
