@@ -48,6 +48,17 @@
 				};
 			}
 
+			if (!Array.prototype.indexOf) {
+				Array.prototype.indexOf = function(what) {
+					for (var i = 0; i < this.length; i++) {
+						if (this[i] === what) {
+							return i;
+						}
+					}
+					return -1;
+				}
+			}
+
 			function delayedBinding (callback) {
 				function binder () {
 					var self = this;
@@ -118,7 +129,7 @@
 							grid: [5, 5],
 							scroll: true,
 							snap: true,
-							snapMode: 'outer',
+							snapMode: 'outer'
 						}).addClass('selectable');
 					})(created.$);					
 
