@@ -144,21 +144,21 @@
 					$(".plugin").addClass("candidate");
 				}
 
-				$(".plugin.candidate").live('click', function(e) {
+				// First click: Source object
+				// Second click: Helper
+				$(".plugin.candidate, .plugin.candidate .helper").live('click', function(e) {
 					var first = ($(".link.from").length == 0);
-					if ($(this).is('.candidate')) {
-						if (first) {
-							first = false;
-							// De-activate candidate on this item
-							$(this).removeClass("candidate");
-							$(this).addClass("link").addClass("from");
-							$('.plugin.candidate .special .link').addClass('available');
-						} else {
-							$('.plugin.candidate .special .link').removeClass('available');
-							$(this).addClass("link").addClass("to");
-							link_objects();
-							detachLinkHandler();
-						}
+					if ($(this).is('.candidate') && first) {
+						// De-activate candidate on this item
+						$(this).removeClass("candidate");
+						$(this).addClass("link").addClass("from");
+						$('.plugin.candidate .special .link').addClass('available');
+					} else if ($(this).hasClass('helper') && !first) {
+						var parent = $(this).parents('.candidate');
+						$('.plugin.candidate .special .link').removeClass('available');
+						$(parent).addClass("link").addClass("to");
+						link_objects();
+						detachLinkHandler();
 					}
 					return false;
 				});
