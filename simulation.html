@@ -19,14 +19,20 @@
 			.hidden  { display: none; }
 
 			div.plugin { float: left; margin: 1em; }
-			div.plugin:hover { border: 1px solid; }
-			div.plugin.selected { background-color: yellow; }
-			div.plugin.candidate { background-color: lightGreen; }
-			div.plugin.noncandidate { background-color: red; }
-			div.plugin.candidate:hover { background-color: cyan; }
-			div.plugin.link { background-color: yellow; }
+			div.plugin:hover div.visual { border: 1px solid; }
+			div.plugin.selected div.visual { background-color: yellow; }
+			div.plugin.candidate div.visual { background-color: lightGreen; }
+			div.plugin.noncandidate div.visual { background-color: red; }
+			div.plugin.candidate:hover div.visual { background-color: cyan; }
+			div.plugin.link div.visual { background-color: yellow; }
 			div.plugin.input { /* Todo: Image */ }
 			div.plugin.output { /* Todo: Image */ }
+			div.plugin div.helper { display: none; }
+			div.plugin div.helper.available { display: block; }
+			div.plugin div.helper.available:hover { background-color: green; }
+			div.plugin.hover_source { background-color: lightGreen; }
+			div.plugin.hover_input { background-color: blue; }
+			div.plugin.hover_output { background-color: red; }
 
 			#toolbox ul li { cursor: hand; text-decoration: underline; color: blue; }
 
@@ -136,36 +142,41 @@
 
 					$("#link").addClass("active");
 					$(".plugin").addClass("candidate");
-					$(".plugin.candidate").click(function(e) {
-						var first = ($(".link.from").length == 0);
-						if ($(this).is('.candidate')) {
-							if (first) {
-								first = false;
-								// De-activate candidate on this item
-								$(this).removeClass("candidate");
-								$(this).addClass("link").addClass("from");
-							} else {
-								$(this).addClass("link").addClass("to");
-								link_objects();
-								detachLinkHandler();
-							}
-						}
-						return false;
-					});
 				}
 
+				$(".plugin.candidate").live('click', function(e) {
+					var first = ($(".link.from").length == 0);
+					if ($(this).is('.candidate')) {
+						if (first) {
+							first = false;
+							// De-activate candidate on this item
+							$(this).removeClass("candidate");
+							$(this).addClass("link").addClass("from");
+							$('.plugin.candidate .special .link').addClass('available');
+						} else {
+							$('.plugin.candidate .special .link').removeClass('available');
+							$(this).addClass("link").addClass("to");
+							link_objects();
+							detachLinkHandler();
+						}
+					}
+					return false;
+				});
+
 				function link_objects () {
-					var from = $(".link.from").attr('plugin_id');
-					var to   = $(".link.to").attr('plugin_id');
+					var from = $(".link.from");
+					var to   = $(".link.to");
 					if (!from || !to) {
 						alert("Error getting targets");
 						return;
 					}
 
-					from = instantiatedObjects[from];
-					to   = instantiatedObjects[to  ];
+					var p_from = instantiatedObjects[from.attr('plugin_id')];
+					var p_to   = instantiatedObjects[to.attr('plugin_id')  ];
 
-					from.attachOutputTo(to);
+					var p_to_helper = $(".helper.chosen", to);
+
+					p_to_helper.trigger('fire', p_from);
 				}
 				function detachLinkHandler () {
 					$Ignore('click', false);
@@ -188,7 +199,7 @@
 				simulate(false);
 
 				$("div.plugin.selectable").live('click', function() {
-					if (!$(this).hasClass('ui-draggable-dragging')) {
+					if (!$(this).hasClass('ui-draggable-dragging') && $("#link.active").length == 0) {
 						$(this).toggleClass('selected');
 					}
 				});

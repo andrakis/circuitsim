@@ -7,10 +7,7 @@ function Plugin () {
 	self._name = "(Untitled plugin " + self.id + ")";
 	self._html = "<span>?</span>";
 	self._jquery_callbacks = {};
-	// Default implementation - simply set outputs and inputs, 1 to 1 relationship
-	self._attachOutputToHandler = function(from, to) {
-	};
-	self._inputs = [];	// Default
+	self._inputs = {};
 }
 
 Plugin.prototype.name = function() {
@@ -31,10 +28,14 @@ Plugin.prototype.click = function(callback) {
 };
 
 Plugin.prototype.input = function(names, callback) {
+	var self = this;
+	
 	assert(callback, "Callback required!");
 	if (typeof names == "string") names = [names];
 
-	
+	names.forEach(function(n) {
+		self._inputs[n] = callback;
+	});
 };
 
 Plugin.prototype.New = function() {
@@ -54,6 +55,49 @@ Plugin.prototype.New = function() {
 		var special = jQuery("<div class='special'></div>");
 		var visual  = jQuery("<div class='visual'></div>");
 		self.$.append(special).append(visual);
+
+		// Create helpers for input bindings
+		for (var n in source._inputs) {
+			(function(name) {
+				var helper = $("<div class='helper link'></div>");
+				helper.attr('input_name', name);
+				helper.text('Link to ' + name);
+				helper.click(function() {
+					helper.addClass('chosen');
+				});
+				helper.bind('fire', function(e, from) {
+					$Debug('Linked to input ' + name);
+					self._inputs[name] = from;
+					from.setOutput(self);
+				});
+				special.append(helper);
+			})(n);
+		}
+
+		self.setOutput = function(out) {
+			if (!self._outputs.indexOf(out)) self._outputs.push(out);
+		};
+
+		self.$.mouseenter(function() {
+			self.$.addClass('hover_source');
+			for (var name in self._inputs) {
+				self._inputs[name].$.addClass('hover_input');
+			}
+			for (var i = 0; i < self._outputs.length; i++) {
+				self._outputs[i].$.addClass('hover_output');
+			}
+		});
+
+		self.$.mouseleave(function() {
+			self.$.removeClass('hover_source');
+			/*for (var name in self._inputs) {
+				self._inputs[name].$.removeClass('hover_input');
+			}
+			for (var i = 0; i < self._outputs.length; i++) {
+				self._outputs[i].$.removeClass('hover_output');
+			}*/
+			jQuery(".plugin").removeClass('hover_input').removeClass('hover_output').removeClass('hover_source');
+		});
 
 		for (var type in source._jquery_callbacks) {
 			(function(_type, _callback, _target) {
